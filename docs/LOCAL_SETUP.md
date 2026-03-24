@@ -29,10 +29,14 @@ If build succeeds, you should have `target/copiproxy-0.1.0.jar`.
 
 ## 3) Configure runtime
 
-CopiProxy reads these environment variables:
+**SQLite database file** defaults to `./copiproxy.db` (relative to the directory you run the app from). Configure it in either place:
+
+- **YAML:** `copiproxy.storage.sqlite-path` in `src/main/resources/application.yml` (or your own override file / profile).
+- **Environment:** `COPROXY_STORAGE_SQLITE_PATH` (preferred), or `DATABASE_PATH` (legacy — same role).
+
+Other common settings:
 
 - `PORT` (default `3000`)
-- `DATABASE_PATH` (default `./copiproxy.db`)
 - `LOG_LEVEL` (default `INFO`)
 - `OTEL_EXPORTER_OTLP_ENDPOINT` (default `http://localhost:4318/v1/traces`)
 
@@ -40,7 +44,8 @@ Example:
 
 ```bash
 export PORT=3000
-export DATABASE_PATH=./copiproxy.db
+export COPROXY_STORAGE_SQLITE_PATH=./copiproxy.db
+# or: export DATABASE_PATH=./copiproxy.db
 export LOG_LEVEL=INFO
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/v1/traces
 ```

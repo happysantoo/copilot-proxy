@@ -77,7 +77,6 @@ public class ProxyService {
         if (path.startsWith("/chat/completions")) {
             String copilotBearer = tokenResolverService.resolveToken(req.getHeader("authorization"));
             builder.header("authorization", "Bearer " + copilotBearer);
-            builder.header("content-length", String.valueOf(body == null ? 0 : body.length));
         }
     }
 }

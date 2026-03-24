@@ -22,7 +22,11 @@
         <spring-boot.version>4.0.0</spring-boot.version>
         <groovy.version>4.0.28</groovy.version>
         <spock.version>2.4-M4-groovy-4.0</spock.version>
-        <jacoco.version>0.8.12</jacoco.version>
+        <!-- 0.8.14+ required when running tests on JDK 25 (class file major 69) -->
+        <jacoco.version>0.8.14</jacoco.version>
+        <wiremock.version>3.13.2</wiremock.version>
+        <!-- Align Jetty EE10 with wiremock-jetty12's jetty-server 12.1.x (mixed 12.0.30 + 12.1.4 breaks at runtime) -->
+        <jetty-ee10.version>12.1.4</jetty-ee10.version>
     </properties>
 
     <dependencyManagement>
@@ -31,6 +35,13 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
                 <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.eclipse.jetty.ee10</groupId>
+                <artifactId>jetty-ee10-bom</artifactId>
+                <version>${jetty-ee10.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -102,6 +113,13 @@
             <version>${spock.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- Jetty-backed runtime for WireMockServer (slim wiremock artifact has no HTTP engine) -->
+        <dependency>
+            <groupId>org.wiremock</groupId>
+            <artifactId>wiremock-jetty12</artifactId>
+            <version>${wiremock.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -142,6 +160,10 @@
                         </goals>
                     </execution>
                 </executions>
+                <configuration>
+                    <!-- Match maven-compiler-plugin release so Spock classes are Java 21 bytecode -->
+                    <targetBytecode>${java.version}</targetBytecode>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.jacoco</groupId>
@@ -154,12 +176,19 @@
                             <goal>prepare-agent</goal>
                         </goals>
                     </execution>
+                    <!-- After unit tests; HTML (and XML) under target/site/jacoco/ -->
                     <execution>
                         <id>report</id>
-                        <phase>verify</phase>
+                        <phase>prepare-package</phase>
                         <goals>
                             <goal>report</goal>
                         </goals>
+                        <configuration>
+                            <formats>
+                                <format>HTML</format>
+                                <format>XML</format>
+                            </formats>
+                        </configuration>
                     </execution>
                     <execution>
                         <id>check</id>
@@ -170,8 +199,6 @@
                         <configuration>
                             <excludes>
                                 <exclude>com/copiproxy/CopiProxyApplication*</exclude>
-                                <exclude>com/copiproxy/service/GithubCopilotService*</exclude>
-                                <exclude>com/copiproxy/service/ProxyService*</exclude>
                                 <exclude>com/copiproxy/repo/ApiKeyRepository*</exclude>
                                 <exclude>com/copiproxy/web/AdminController*</exclude>
                             </excludes>

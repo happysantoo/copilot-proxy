@@ -38,12 +38,35 @@ No frontend required -- everything is managed via REST endpoints and CLI.
 mvn spring-boot:run
 ```
 
+## Code coverage (JaCoCo)
+
+After tests, an HTML report is generated automatically when you build through **`package`** or later (for example `mvn clean package` or `mvn verify`):
+
+- **HTML:** `target/site/jacoco/index.html`
+- **XML (for CI):** `target/site/jacoco/jacoco.xml`
+
+To refresh only the report using the last `target/jacoco.exec` (for example you ran `mvn test` already):
+
+```bash
+mvn jacoco:report
+```
+
+## Configuration
+
+**SQLite file location** (sensible default: `./copiproxy.db` in the process working directory):
+
+- In config: set `copiproxy.storage.sqlite-path` in [`application.yml`](src/main/resources/application.yml) (or an external `application.yml` / profile).
+- Via environment (either works; first wins in the chain below):
+  - `COPROXY_STORAGE_SQLITE_PATH` — preferred name
+  - `DATABASE_PATH` — legacy alias
+
 ## Environment variables
 
 | Variable | Default | Description |
 |---|---|---|
 | `PORT` | `3000` | HTTP server port |
-| `DATABASE_PATH` | `./copiproxy.db` | SQLite database file path |
+| `COPROXY_STORAGE_SQLITE_PATH` | (see `application.yml`) | SQLite database file path |
+| `DATABASE_PATH` | `./copiproxy.db` | Legacy alias for the SQLite file path |
 | `LOG_LEVEL` | `INFO` | Root log level |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318/v1/traces` | OTLP trace collector endpoint |
 

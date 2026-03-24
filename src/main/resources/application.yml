@@ -5,7 +5,7 @@ spring:
     virtual:
       enabled: true
   datasource:
-    url: jdbc:sqlite:${DATABASE_PATH:./copiproxy.db}
+    url: jdbc:sqlite:${copiproxy.storage.sqlite-path}
     driver-class-name: org.sqlite.JDBC
   sql:
     init:
@@ -19,6 +19,10 @@ logging:
     root: ${LOG_LEVEL:INFO}
 
 copiproxy:
+  storage:
+    # Path to the SQLite database file (relative or absolute).
+    # Override via application config, or env: COPROXY_STORAGE_SQLITE_PATH or DATABASE_PATH (legacy).
+    sqlite-path: ${COPROXY_STORAGE_SQLITE_PATH:${DATABASE_PATH:./copiproxy.db}}
   github:
     device-code-url: https://github.com/login/device/code
     oauth-url: https://github.com/login/oauth/access_token
