@@ -10,7 +10,7 @@ public record CopiProxyProperties(
         String copilotApiUrl,
         String copilotTokenUrl,
         String clientId,
-        @DefaultValue("claude-opus-4") String defaultModel,
+        @DefaultValue("claude-opus-4-6") String defaultModel,
         @DefaultValue("vscode/1.98.0") String editorVersion,
         @DefaultValue("copilot-chat/0.23.2") String editorPluginVersion,
         @DefaultValue("GitHubCopilotChat/0.23.2") String userAgent,

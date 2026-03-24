@@ -37,7 +37,7 @@ If build succeeds, you should have `target/copiproxy-0.1.0.jar`.
 Other common settings:
 
 - `PORT` (default `3000`)
-- `COPIPROXY_DEFAULT_MODEL` (default `claude-opus-4`) -- model injected when the client omits `model` from the request body
+- `COPIPROXY_DEFAULT_MODEL` (default `claude-opus-4-6`) -- model injected when the client omits `model` from the request body
 - `LOG_LEVEL` (default `INFO`)
 - `OTEL_EXPORTER_OTLP_ENDPOINT` (default `http://localhost:4318/v1/traces`)
 
@@ -47,7 +47,7 @@ Example:
 export PORT=3000
 export COPROXY_STORAGE_SQLITE_PATH=./copiproxy.db
 # or: export DATABASE_PATH=./copiproxy.db
-export COPIPROXY_DEFAULT_MODEL=claude-opus-4
+export COPIPROXY_DEFAULT_MODEL=claude-opus-4-6
 export LOG_LEVEL=INFO
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/v1/traces
 ```
@@ -122,53 +122,49 @@ You will receive events including:
 Open `verificationUri`, enter `userCode`, approve access.  
 On success, CopiProxy stores the resulting token as a key record (you can then set it as default with `/admin/api-keys/default`).
 
-## 7) Test OpenAI-compatible endpoints
+## 7) Test endpoints
 
 ### List models
 
 ```bash
-curl http://localhost:3000/api/models
+curl http://localhost:3000/v1/models
 ```
 
 This returns the live catalog from Copilot, including Claude Sonnet/Opus and GPT models your subscription has access to.
 
-### Chat completion using default model (claude-opus-4)
-
-Omit `model` and CopiProxy injects the configured default:
+### Messages (non-streaming)
 
 ```bash
-curl -X POST http://localhost:3000/api/chat/completions \
+curl -X POST http://localhost:3000/v1/messages \
   -H 'content-type: application/json' \
-  -d '{
-    "messages":[{"role":"user","content":"Say hello"}]
-  }'
+  -H 'x-api-key: _' \
+  -d '{"model":"claude-opus-4-6","max_tokens":100,"messages":[{"role":"user","content":"Say hello"}]}'
 ```
 
-### Chat completion with explicit model
+Omit `model` and CopiProxy injects the configured default (`claude-opus-4-6` unless you changed `COPIPROXY_DEFAULT_MODEL`).
+
+### Messages (streaming)
+
+Same request with `"stream": true`:
 
 ```bash
-curl -X POST http://localhost:3000/api/chat/completions \
+curl -X POST http://localhost:3000/v1/messages \
   -H 'content-type: application/json' \
-  -d '{
-    "model":"claude-sonnet-4.6",
-    "messages":[{"role":"user","content":"Say hello"}]
-  }'
+  -H 'x-api-key: _' \
+  -d '{"model":"claude-opus-4-6","max_tokens":100,"stream":true,"messages":[{"role":"user","content":"Say hello"}]}'
 ```
 
-Available Claude model IDs: `claude-opus-4`, `claude-sonnet-4.6`, `claude-sonnet-4.5`, `claude-sonnet-4-20250514`.
+### Messages with explicit key override
+
+```bash
+curl -X POST http://localhost:3000/v1/messages \
+  -H 'content-type: application/json' \
+  -H 'x-api-key: YOUR_KEY' \
+  -d '{"model":"claude-opus-4-6","max_tokens":100,"messages":[{"role":"user","content":"Say hello"}]}'
+```
+
+Available Claude model IDs: `claude-opus-4-6`, `claude-opus-4`, `claude-sonnet-4.6`, `claude-sonnet-4.5`, `claude-sonnet-4-20250514`.
 GPT models (e.g. `gpt-4o`, `gpt-4.1`) also work. See [USING_COPILOT_MODELS.md](USING_COPILOT_MODELS.md) for full details.
-
-### Chat completion with explicit key override
-
-```bash
-curl -X POST http://localhost:3000/api/chat/completions \
-  -H 'content-type: application/json' \
-  -H 'authorization: Bearer <YOUR_GITHUB_KEY>' \
-  -d '{
-    "model":"claude-opus-4",
-    "messages":[{"role":"user","content":"Say hello"}]
-  }'
-```
 
 ### Dummy token for tools that require non-empty API key
 
@@ -176,20 +172,25 @@ Some clients require an API key value even when using a default server key.
 Use `_`:
 
 ```bash
--H 'authorization: Bearer _'
+-H 'x-api-key: _'
 ```
 
 CopiProxy interprets `_` as "use configured default key".
 
-## 8) Configure OpenAI-compatible clients
+## 8) Configure Claude Code
 
-Any tool that supports a custom OpenAI base URL can use CopiProxy:
+Point Claude Code at the local proxy and set default model IDs to ones your Copilot catalog exposes:
 
-- **Base URL:** `http://localhost:3000/api`
-- **API key:** your GitHub key, or `_` if a default key is configured in CopiProxy.
-- **Model:** any ID from `GET /api/models` (e.g. `claude-opus-4`, `claude-sonnet-4.6`, `gpt-4o`). If omitted, CopiProxy injects the configured default (`claude-opus-4`).
+```bash
+export ANTHROPIC_BASE_URL="http://localhost:3000"
+export ANTHROPIC_API_KEY="_"
+export ANTHROPIC_DEFAULT_SONNET_MODEL="claude-sonnet-4.6"
+export ANTHROPIC_DEFAULT_OPUS_MODEL="claude-opus-4-6"
+export ANTHROPIC_DEFAULT_HAIKU_MODEL="claude-sonnet-4.6"
+claude
+```
 
-> **Note:** Claude Code uses the Anthropic Messages API (`/v1/messages`), not OpenAI Chat Completions. CopiProxy does **not** implement that protocol and cannot drive Claude Code directly. See [CLAUDE_CODE_COMPATIBILITY.md](CLAUDE_CODE_COMPATIBILITY.md) for a detailed gap analysis.
+Use your real GitHub key in `ANTHROPIC_API_KEY` if you are not relying on a default key configured in CopiProxy.
 
 ## 9) OpenTelemetry / monitoring
 
@@ -205,8 +206,8 @@ If no OTLP collector is running, proxy still functions; trace export attempts ma
 
 ## 10) Troubleshooting
 
-- **401 / missing API key**: ensure you set a default key or pass `authorization: Bearer <key>`.
-- **400 model errors**: check model availability under your GitHub Copilot account settings and verify with `/api/models`.
+- **401 / missing API key**: ensure you set a default key in CopiProxy or pass `x-api-key: <key>` (or `x-api-key: _` to use the configured default).
+- **400 model errors**: check model availability under your GitHub Copilot account settings and verify with `GET /v1/models`.
 - **429 rate limited**: Copilot Pro has per-model rate limits; see [USING_COPILOT_MODELS.md](USING_COPILOT_MODELS.md) for details.
 - **No models returned**: key may be invalid/expired; refresh metadata using:
   - `POST /admin/api-keys/{id}/refresh-meta`

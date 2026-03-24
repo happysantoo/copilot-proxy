@@ -4,6 +4,9 @@ spring:
   threads:
     virtual:
       enabled: true
+  mvc:
+    async:
+      request-timeout: 600000
   datasource:
     url: jdbc:sqlite:${copiproxy.storage.sqlite-path}
     driver-class-name: org.sqlite.JDBC
@@ -17,6 +20,9 @@ server:
 logging:
   level:
     root: ${LOG_LEVEL:INFO}
+    # Set to TRACE to see full request/response payloads in the controller
+    # com.copiproxy.web.ProxyController: ${CONTROLLER_LOG_LEVEL:INFO}
+  config: classpath:logback-spring.xml
 
 copiproxy:
   storage:
@@ -29,8 +35,8 @@ copiproxy:
     copilot-api-url: https://api.githubcopilot.com
     copilot-token-url: https://api.github.com/copilot_internal/v2/token
     client-id: Iv1.b507a08c87ecfe98
-    # Model injected when the client omits "model" from the request body.
-    default-model: ${COPIPROXY_DEFAULT_MODEL:claude-opus-4}
+    # Model injected when the Anthropic client omits "model" from the request body.
+    default-model: ${COPIPROXY_DEFAULT_MODEL:claude-opus-4-6}
     # Headers sent to Copilot upstream. Override to match a different editor fingerprint.
     # editor-version: vscode/1.98.0
     # editor-plugin-version: copilot-chat/0.23.2

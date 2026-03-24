@@ -1,5 +1,6 @@
 package com.copiproxy.web
 
+import com.copiproxy.service.MessageTranslationService
 import com.copiproxy.service.ProxyService
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpStatus
@@ -10,23 +11,11 @@ import spock.lang.Specification
 class ProxyControllerSpec extends Specification {
 
     def proxyService = Mock(ProxyService)
+    def translationService = Mock(MessageTranslationService)
     def request = Mock(HttpServletRequest)
-    def controller = new ProxyController(proxyService)
+    def controller = new ProxyController(proxyService, translationService)
 
-    def "chatCompletions delegates to proxy service"() {
-        given:
-        byte[] body = '{"m":"x"}'.bytes
-        ResponseEntity<StreamingResponseBody> expected = ResponseEntity.status(HttpStatus.OK).body({ out -> } as StreamingResponseBody)
-
-        when:
-        def result = controller.chatCompletions(request, body)
-
-        then:
-        1 * proxyService.proxy("/chat/completions", request, body) >> expected
-        result == expected
-    }
-
-    def "models delegates to proxy service"() {
+    def "models delegates to proxy service pass-through"() {
         given:
         ResponseEntity<StreamingResponseBody> expected = ResponseEntity.status(HttpStatus.OK).body({ out -> } as StreamingResponseBody)
 
@@ -34,7 +23,7 @@ class ProxyControllerSpec extends Specification {
         def result = controller.models(request)
 
         then:
-        1 * proxyService.proxy("/models", request, null) >> expected
+        1 * proxyService.proxy("/models", request) >> expected
         result == expected
     }
 }

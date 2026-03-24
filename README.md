@@ -1,14 +1,16 @@
-# CopiProxy - GitHub Copilot as OpenAI-Compatible API (Java 21)
+# CopiProxy - Anthropic-Compatible Copilot Proxy for Claude Code (Java 21)
 
-A Java 21 local proxy that exposes your GitHub Copilot quota as OpenAI-compatible APIs.
-No frontend required -- everything is managed via REST endpoints and CLI.
+A Java 21 local proxy that exposes your GitHub Copilot quota as an **Anthropic Messages API**. Claude Code and other Anthropic-compatible clients can use Copilot models through bidirectional translation (Anthropic ↔ OpenAI) to the Copilot upstream.
+
+No frontend required — everything is managed via REST endpoints and CLI.
 
 ## Features
 
-- OpenAI-compatible proxy endpoints:
-  - `POST /api/chat/completions` (streaming)
-  - `GET /api/models`
-- **Claude Sonnet and Opus models** via Copilot Pro (default: `claude-opus-4`); see [docs/USING_COPILOT_MODELS.md](docs/USING_COPILOT_MODELS.md)
+- Anthropic-compatible proxy endpoints:
+  - `POST /v1/messages` (accepts Anthropic format; translates to OpenAI for Copilot upstream; streaming supported)
+  - `GET /v1/models` (pass-through)
+- **Bidirectional translation** between Anthropic Messages API requests/responses and the OpenAI-style API GitHub Copilot expects
+- **Claude Sonnet and Opus models** via Copilot Pro (default: `claude-opus-4-6`); see [docs/USING_COPILOT_MODELS.md](docs/USING_COPILOT_MODELS.md)
 - Proxies to `https://api.githubcopilot.com`
 - API key management (REST):
   - `GET /admin/api-keys`
@@ -23,6 +25,10 @@ No frontend required -- everything is managed via REST endpoints and CLI.
 - SQLite persistence
 - Java 21 virtual threads
 - OpenTelemetry tracing and metrics via Spring Boot Actuator
+
+### Limitations
+
+Some Anthropic features or fields may not map one-to-one to Copilot. See [docs/TRANSLATION_GAP_ANALYSIS.md](docs/TRANSLATION_GAP_ANALYSIS.md) for details.
 
 ## Prerequisites
 
@@ -68,7 +74,7 @@ mvn jacoco:report
 | `PORT` | `3000` | HTTP server port |
 | `COPROXY_STORAGE_SQLITE_PATH` | (see `application.yml`) | SQLite database file path |
 | `DATABASE_PATH` | `./copiproxy.db` | Legacy alias for the SQLite file path |
-| `COPIPROXY_DEFAULT_MODEL` | `claude-opus-4` | Model injected when client omits `model` from the request body |
+| `COPIPROXY_DEFAULT_MODEL` | `claude-opus-4-6` | Model injected when client omits `model` from the request body |
 | `LOG_LEVEL` | `INFO` | Root log level |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318/v1/traces` | OTLP trace collector endpoint |
 
@@ -93,12 +99,13 @@ curl -X POST http://localhost:3000/admin/api-keys/default \
 ### 3. Use the proxy
 
 ```bash
-curl -X POST http://localhost:3000/api/chat/completions \
+curl -X POST http://localhost:3000/v1/messages \
   -H 'content-type: application/json' \
-  -d '{"model":"claude-opus-4","messages":[{"role":"user","content":"hi"}]}'
+  -H 'x-api-key: _' \
+  -d '{"model":"claude-opus-4-6","max_tokens":100,"messages":[{"role":"user","content":"hi"}]}'
 ```
 
-Omit `"model"` to use the configured default (`claude-opus-4`). See [docs/USING_COPILOT_MODELS.md](docs/USING_COPILOT_MODELS.md) for all supported Claude model IDs.
+Omit `"model"` to use the configured default (`claude-opus-4-6`). See [docs/USING_COPILOT_MODELS.md](docs/USING_COPILOT_MODELS.md) for all supported Claude model IDs.
 
 ### Or use device flow (interactive GitHub login)
 
@@ -107,6 +114,19 @@ curl -N http://localhost:3000/admin/api-keys/device-flow
 ```
 
 Follow the SSE events to complete authorization in your browser.
+
+## Claude Code setup
+
+Point Claude Code at the proxy and map model tiers to Copilot model IDs:
+
+```bash
+export ANTHROPIC_BASE_URL="http://localhost:3000"
+export ANTHROPIC_API_KEY="_"
+export ANTHROPIC_DEFAULT_SONNET_MODEL="claude-sonnet-4.6"
+export ANTHROPIC_DEFAULT_OPUS_MODEL="claude-opus-4-6"
+export ANTHROPIC_DEFAULT_HAIKU_MODEL="claude-sonnet-4.6"
+claude
+```
 
 ## Observability
 

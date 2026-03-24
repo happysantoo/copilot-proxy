@@ -1,13 +1,10 @@
 package com.copiproxy.service;
 
 import com.copiproxy.config.CopiProxyProperties;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
@@ -18,10 +15,10 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Enumeration;
 import java.util.HexFormat;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -29,8 +26,13 @@ public class ProxyService {
 
     private static final Logger log = LoggerFactory.getLogger(ProxyService.class);
 
+    private static final Set<String> STRIPPED_HEADERS = Set.of(
+            "host", "content-length", "connection", "transfer-encoding",
+            "upgrade", "keep-alive", "proxy-connection", "te", "trailer",
+            "anthropic-version", "anthropic-beta", "x-api-key"
+    );
+
     private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20)).build();
-    private final ObjectMapper objectMapper = new ObjectMapper();
     private final CopiProxyProperties properties;
     private final TokenResolverService tokenResolverService;
 
@@ -47,18 +49,17 @@ public class ProxyService {
         this.syntheticSessionId = UUID.randomUUID() + String.valueOf(System.currentTimeMillis());
     }
 
-    public ResponseEntity<StreamingResponseBody> proxy(String upstreamPath, HttpServletRequest request, byte[] body) {
+    /**
+     * Forward to Copilot and return the raw upstream response (status + InputStream).
+     * Caller is responsible for reading/translating the body.
+     */
+    public HttpResponse<InputStream> proxyRaw(String upstreamPath, HttpServletRequest request, byte[] body) {
         try {
-            byte[] effectiveBody = body;
-            if (upstreamPath.startsWith("/chat/completions") && effectiveBody != null && effectiveBody.length > 0) {
-                effectiveBody = ensureDefaultModel(effectiveBody);
-            }
-
             String query = request.getQueryString();
             String targetUrl = properties.copilotApiUrl() + upstreamPath + (query == null ? "" : "?" + query);
             HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(targetUrl))
                     .timeout(Duration.ofMinutes(5))
-                    .method(request.getMethod(), bodyPublisher(request.getMethod(), effectiveBody));
+                    .POST(HttpRequest.BodyPublishers.ofByteArray(body == null ? new byte[0] : body));
 
             copyHeaders(request, builder);
             HttpResponse<InputStream> upstream = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
@@ -66,6 +67,28 @@ public class ProxyService {
             if (upstream.statusCode() == 429) {
                 log.warn("Copilot returned 429 Too Many Requests for {}", upstreamPath);
             }
+            return upstream;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Failed to proxy request", e);
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to proxy request", e);
+        }
+    }
+
+    /**
+     * Pass-through proxy for paths that need no translation (e.g. /models).
+     */
+    public ResponseEntity<StreamingResponseBody> proxy(String upstreamPath, HttpServletRequest request) {
+        try {
+            String query = request.getQueryString();
+            String targetUrl = properties.copilotApiUrl() + upstreamPath + (query == null ? "" : "?" + query);
+            HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(targetUrl))
+                    .timeout(Duration.ofMinutes(5))
+                    .GET();
+
+            copyHeaders(request, builder);
+            HttpResponse<InputStream> upstream = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
 
             HttpHeaders headers = new HttpHeaders();
             String contentType = upstream.headers().firstValue("content-type").orElse("application/json");
@@ -80,37 +103,18 @@ public class ProxyService {
         }
     }
 
-    byte[] ensureDefaultModel(byte[] body) {
-        try {
-            ObjectNode node = (ObjectNode) objectMapper.readTree(body);
-            if (!node.has("model") || node.get("model").isNull() || node.get("model").asText().isBlank()) {
-                node.put("model", properties.defaultModel());
-                return objectMapper.writeValueAsBytes(node);
-            }
-        } catch (IOException ignored) {
-            // Not valid JSON -- forward as-is and let upstream report the error
-        }
-        return body;
-    }
-
-    private HttpRequest.BodyPublisher bodyPublisher(String method, byte[] body) {
-        if (HttpMethod.GET.matches(method) || HttpMethod.HEAD.matches(method)) {
-            return HttpRequest.BodyPublishers.noBody();
-        }
-        return HttpRequest.BodyPublishers.ofByteArray(body == null ? new byte[0] : body);
-    }
-
     private void copyHeaders(HttpServletRequest req, HttpRequest.Builder builder) {
+        String authKey = resolveAuthKey(req);
+
         Enumeration<String> names = req.getHeaderNames();
         while (names.hasMoreElements()) {
             String name = names.nextElement();
-            if ("host".equalsIgnoreCase(name) || "content-length".equalsIgnoreCase(name)) {
-                continue;
-            }
+            if (STRIPPED_HEADERS.contains(name.toLowerCase())) continue;
+            if ("authorization".equalsIgnoreCase(name)) continue;
             builder.header(name, req.getHeader(name));
         }
 
-        String copilotBearer = tokenResolverService.resolveToken(req.getHeader("authorization"));
+        String copilotBearer = tokenResolverService.resolveToken(authKey);
         builder.header("authorization", "Bearer " + copilotBearer);
 
         builder.header("editor-version", properties.editorVersion());
@@ -124,5 +128,18 @@ public class ProxyService {
         builder.header("x-request-id", UUID.randomUUID().toString());
         builder.header("vscode-machineid", syntheticMachineId);
         builder.header("vscode-sessionid", syntheticSessionId);
+    }
+
+    /**
+     * Anthropic clients send x-api-key; OpenAI clients send Authorization: Bearer.
+     * Normalise to "Bearer <key>" for TokenResolverService.
+     */
+    private String resolveAuthKey(HttpServletRequest req) {
+        String xApiKey = req.getHeader("x-api-key");
+        if (xApiKey != null && !xApiKey.isBlank()) {
+            return "Bearer " + xApiKey;
+        }
+        String auth = req.getHeader("authorization");
+        return auth != null ? auth : "";
     }
 }
