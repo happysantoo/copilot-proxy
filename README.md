@@ -8,6 +8,7 @@ No frontend required -- everything is managed via REST endpoints and CLI.
 - OpenAI-compatible proxy endpoints:
   - `POST /api/chat/completions` (streaming)
   - `GET /api/models`
+- **Claude Sonnet and Opus models** via Copilot Pro (default: `claude-opus-4`); see [docs/USING_COPILOT_MODELS.md](docs/USING_COPILOT_MODELS.md)
 - Proxies to `https://api.githubcopilot.com`
 - API key management (REST):
   - `GET /admin/api-keys`
@@ -67,6 +68,7 @@ mvn jacoco:report
 | `PORT` | `3000` | HTTP server port |
 | `COPROXY_STORAGE_SQLITE_PATH` | (see `application.yml`) | SQLite database file path |
 | `DATABASE_PATH` | `./copiproxy.db` | Legacy alias for the SQLite file path |
+| `COPIPROXY_DEFAULT_MODEL` | `claude-opus-4` | Model injected when client omits `model` from the request body |
 | `LOG_LEVEL` | `INFO` | Root log level |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318/v1/traces` | OTLP trace collector endpoint |
 
@@ -93,8 +95,10 @@ curl -X POST http://localhost:3000/admin/api-keys/default \
 ```bash
 curl -X POST http://localhost:3000/api/chat/completions \
   -H 'content-type: application/json' \
-  -d '{"model":"gpt-4.1","messages":[{"role":"user","content":"hi"}]}'
+  -d '{"model":"claude-opus-4","messages":[{"role":"user","content":"hi"}]}'
 ```
+
+Omit `"model"` to use the configured default (`claude-opus-4`). See [docs/USING_COPILOT_MODELS.md](docs/USING_COPILOT_MODELS.md) for all supported Claude model IDs.
 
 ### Or use device flow (interactive GitHub login)
 

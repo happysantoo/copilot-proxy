@@ -32,7 +32,15 @@ class GithubCopilotServiceWireMockSpec extends Specification {
                 b + "/login/oauth/access_token",
                 b + "/copilot-api",
                 b + "/copilot_internal/v2/token",
-                "test-client-id"
+                "test-client-id",
+                "claude-opus-4",
+                "vscode/1.98.0",
+                "copilot-chat/0.23.2",
+                "GitHubCopilotChat/0.23.2",
+                "vscode-chat",
+                "github-copilot",
+                "conversation-panel",
+                "2025-01-21"
         )
     }
 

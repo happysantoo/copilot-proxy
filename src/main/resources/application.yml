@@ -29,6 +29,16 @@ copiproxy:
     copilot-api-url: https://api.githubcopilot.com
     copilot-token-url: https://api.github.com/copilot_internal/v2/token
     client-id: Iv1.b507a08c87ecfe98
+    # Model injected when the client omits "model" from the request body.
+    default-model: ${COPIPROXY_DEFAULT_MODEL:claude-opus-4}
+    # Headers sent to Copilot upstream. Override to match a different editor fingerprint.
+    # editor-version: vscode/1.98.0
+    # editor-plugin-version: copilot-chat/0.23.2
+    # user-agent: GitHubCopilotChat/0.23.2
+    # copilot-integration-id: vscode-chat
+    # openai-organization: github-copilot
+    # openai-intent: conversation-panel
+    # github-api-version: 2025-01-21
 
 management:
   endpoints:

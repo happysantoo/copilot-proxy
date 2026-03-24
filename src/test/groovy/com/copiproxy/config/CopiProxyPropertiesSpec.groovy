@@ -11,7 +11,15 @@ class CopiProxyPropertiesSpec extends Specification {
                 "https://github.com/login/oauth/access_token",
                 "https://api.githubcopilot.com",
                 "https://api.github.com/copilot_internal/v2/token",
-                "client-id"
+                "client-id",
+                "claude-opus-4",
+                "vscode/1.98.0",
+                "copilot-chat/0.23.2",
+                "GitHubCopilotChat/0.23.2",
+                "vscode-chat",
+                "github-copilot",
+                "conversation-panel",
+                "2025-01-21"
         )
 
         then:
@@ -20,5 +28,8 @@ class CopiProxyPropertiesSpec extends Specification {
         props.copilotApiUrl() == "https://api.githubcopilot.com"
         props.copilotTokenUrl() == "https://api.github.com/copilot_internal/v2/token"
         props.clientId() == "client-id"
+        props.defaultModel() == "claude-opus-4"
+        props.editorVersion() == "vscode/1.98.0"
+        props.openaiOrganization() == "github-copilot"
     }
 }

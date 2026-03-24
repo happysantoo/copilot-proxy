@@ -20,7 +20,7 @@ curl --version
 ## 2) Clone and build
 
 ```bash
-git clone https://github.com/coxy-proxy/coxy.git copiproxy
+git clone https://github.com/happysantoo/copilot-proxy.git copiproxy
 cd copiproxy
 mvn clean package -DskipTests
 ```
@@ -37,6 +37,7 @@ If build succeeds, you should have `target/copiproxy-0.1.0.jar`.
 Other common settings:
 
 - `PORT` (default `3000`)
+- `COPIPROXY_DEFAULT_MODEL` (default `claude-opus-4`) -- model injected when the client omits `model` from the request body
 - `LOG_LEVEL` (default `INFO`)
 - `OTEL_EXPORTER_OTLP_ENDPOINT` (default `http://localhost:4318/v1/traces`)
 
@@ -46,6 +47,7 @@ Example:
 export PORT=3000
 export COPROXY_STORAGE_SQLITE_PATH=./copiproxy.db
 # or: export DATABASE_PATH=./copiproxy.db
+export COPIPROXY_DEFAULT_MODEL=claude-opus-4
 export LOG_LEVEL=INFO
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/v1/traces
 ```
@@ -128,16 +130,33 @@ On success, CopiProxy stores the resulting token as a key record (you can then s
 curl http://localhost:3000/api/models
 ```
 
-### Chat completion using default key
+This returns the live catalog from Copilot, including Claude Sonnet/Opus and GPT models your subscription has access to.
+
+### Chat completion using default model (claude-opus-4)
+
+Omit `model` and CopiProxy injects the configured default:
 
 ```bash
 curl -X POST http://localhost:3000/api/chat/completions \
   -H 'content-type: application/json' \
   -d '{
-    "model":"gpt-4.1",
     "messages":[{"role":"user","content":"Say hello"}]
   }'
 ```
+
+### Chat completion with explicit model
+
+```bash
+curl -X POST http://localhost:3000/api/chat/completions \
+  -H 'content-type: application/json' \
+  -d '{
+    "model":"claude-sonnet-4.6",
+    "messages":[{"role":"user","content":"Say hello"}]
+  }'
+```
+
+Available Claude model IDs: `claude-opus-4`, `claude-sonnet-4.6`, `claude-sonnet-4.5`, `claude-sonnet-4-20250514`.
+GPT models (e.g. `gpt-4o`, `gpt-4.1`) also work. See [USING_COPILOT_MODELS.md](USING_COPILOT_MODELS.md) for full details.
 
 ### Chat completion with explicit key override
 
@@ -146,14 +165,14 @@ curl -X POST http://localhost:3000/api/chat/completions \
   -H 'content-type: application/json' \
   -H 'authorization: Bearer <YOUR_GITHUB_KEY>' \
   -d '{
-    "model":"gpt-4.1",
+    "model":"claude-opus-4",
     "messages":[{"role":"user","content":"Say hello"}]
   }'
 ```
 
 ### Dummy token for tools that require non-empty API key
 
-Some clients require an API key value even when using a default server key.  
+Some clients require an API key value even when using a default server key.
 Use `_`:
 
 ```bash
@@ -162,16 +181,15 @@ Use `_`:
 
 CopiProxy interprets `_` as "use configured default key".
 
-## 8) Configure Claude Code / OpenAI-compatible clients
+## 8) Configure OpenAI-compatible clients
 
-Use these values:
+Any tool that supports a custom OpenAI base URL can use CopiProxy:
 
-- Base URL: `http://localhost:3000/api`
-- API key:
-  - preferred: your key, or
-  - `_` if default key is set in CopiProxy and client insists on non-empty key.
+- **Base URL:** `http://localhost:3000/api`
+- **API key:** your GitHub key, or `_` if a default key is configured in CopiProxy.
+- **Model:** any ID from `GET /api/models` (e.g. `claude-opus-4`, `claude-sonnet-4.6`, `gpt-4o`). If omitted, CopiProxy injects the configured default (`claude-opus-4`).
 
-If your client supports custom model names, use models returned by `GET /api/models`.
+> **Note:** Claude Code uses the Anthropic Messages API (`/v1/messages`), not OpenAI Chat Completions. CopiProxy does **not** implement that protocol and cannot drive Claude Code directly. See [CLAUDE_CODE_COMPATIBILITY.md](CLAUDE_CODE_COMPATIBILITY.md) for a detailed gap analysis.
 
 ## 9) OpenTelemetry / monitoring
 
@@ -189,6 +207,7 @@ If no OTLP collector is running, proxy still functions; trace export attempts ma
 
 - **401 / missing API key**: ensure you set a default key or pass `authorization: Bearer <key>`.
 - **400 model errors**: check model availability under your GitHub Copilot account settings and verify with `/api/models`.
+- **429 rate limited**: Copilot Pro has per-model rate limits; see [USING_COPILOT_MODELS.md](USING_COPILOT_MODELS.md) for details.
 - **No models returned**: key may be invalid/expired; refresh metadata using:
   - `POST /admin/api-keys/{id}/refresh-meta`
 - **Port conflict**: change `PORT`, e.g. `export PORT=3100`.
