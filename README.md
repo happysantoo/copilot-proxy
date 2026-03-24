@@ -135,6 +135,10 @@ claude
 - Prometheus: `GET /actuator/prometheus`
 - Distributed tracing exported via OTLP
 
+## Acknowledgments
+
+**[hankchiutw](https://github.com/hankchiutw)** — thank you for the original Copilot-proxy idea and the work that inspired this project.
+
 ## License
 
 Apache License 2.0 — see [LICENSE](LICENSE).
