@@ -1,62 +1,35 @@
-# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+# Build output
+target/
 
-# compiled output
-dist
-tmp
-out-tsc
-
-# dependencies
-node_modules
-
-# IDEs and editors
+# IDE
 /.idea
+*.iml
 .project
 .classpath
-.c9/
-*.launch
 .settings/
+*.launch
 *.sublime-workspace
+.vscode/
 
-# IDE - VSCode
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
+# Compiled classes
+*.class
 
-# misc
-/.sass-cache
-/connect.lock
-/coverage
-/libpeerconnection.log
-npm-debug.log
-yarn-error.log
-testem.log
-/typings
+# Package files
+*.jar
+*.war
+*.ear
 
-# System Files
-.DS_Store
-Thumbs.db
+# SQLite database
 *.db
 
-.nx/cache
-.nx/workspace-data
-.cursor/rules/nx-rules.mdc
-.github/instructions/nx.instructions.md
+# Logs
+*.log
 
-.angular
+# OS files
+.DS_Store
+Thumbs.db
 
-vite.config.*.timestamp*
-vitest.config.*.timestamp*
-
+# Environment
 .env
 .env.local
 .env.*.local
-
-# for api keys
-.storage
-
-# Next.js
-.next
-out
-/generated/prisma

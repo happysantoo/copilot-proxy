@@ -1,96 +1,93 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/coxy-proxy/coxy/refs/heads/main/assets/header-light.png">
-    <img alt="Coxy logo" src="https://raw.githubusercontent.com/coxy-proxy/coxy/refs/heads/main/assets/header-dark.png" width="200">
-  </picture>
-  <br />
-  <strong>GitHub Copilot as OpenAI-compatible APIs</strong>
-  <br />
-  <br />
-  <img alt="Coxy demo" src="https://raw.githubusercontent.com/coxy-proxy/coxy/refs/heads/main/assets/coxy-demo.gif" width="800">
-</p>
+# CopiProxy - GitHub Copilot as OpenAI-Compatible API (Java 21)
 
-
-
-## Why?
-- You have a lot of free quota on GitHub Copilot, you want to use it like OpenAI-compatible APIs.
-- You want the computing power of GitHub Copilot beyond VS Code.
-- You want to use modern models like gpt-4.1 free.
-- You have multiple GitHub accounts and the free quota is just wasted.
-- Host LLM locally and leave the computing remotely.
+A Java 21 local proxy that exposes your GitHub Copilot quota as OpenAI-compatible APIs.
+No frontend required -- everything is managed via REST endpoints and CLI.
 
 ## Features
 
-- Proxies requests to `https://api.githubcopilot.com`
-  - Support endpoints: `/chat/completions`, `/models`
-- User-friendly admin UI:
-  - Log in with GitHub and generate tokens
-  - Add tokens manually
-  - Manage multiple tokens with ease
-  - View chat message usage statistics
-  - Simple chat bot for model evaluation
-    - Client-side chat session history
+- OpenAI-compatible proxy endpoints:
+  - `POST /api/chat/completions` (streaming)
+  - `GET /api/models`
+- Proxies to `https://api.githubcopilot.com`
+- API key management (REST):
+  - `GET /admin/api-keys`
+  - `POST /admin/api-keys`
+  - `PATCH /admin/api-keys/{id}`
+  - `DELETE /admin/api-keys/{id}`
+  - `POST /admin/api-keys/default`
+  - `POST /admin/api-keys/{id}/refresh-meta`
+- GitHub device flow authentication (SSE):
+  - `GET /admin/api-keys/device-flow`
+- Default token + dummy token `_` support
+- SQLite persistence
+- Java 21 virtual threads
+- OpenTelemetry tracing and metrics via Spring Boot Actuator
 
-## How to use
-- Start the proxy server
-  - Option 1: Use Docker
-    ```bash
-    docker run -p 3000:3000 ghcr.io/coxy-proxy/coxy:latest
-    ```
-  - Option 2: Use `pnpx`(recommended) or `npx`
-    ```bash
-    pnpx coxy
-    ```
-- Browse `http://localhost:3000` to generate the token by following the instructions.
-  - Or add your own token manually.
-- Set a default token.
-- Your OpenAI-compatible API base URL is `http://localhost:3000/api`
-  - You can test it like this: (no need authorization header since you've set a default token!)
-  ```
-  curl --request POST --url http://localhost:3000/api/chat/completions --header 'content-type: application/json' \
-  --data '{
-      "model": "gpt-4",
-      "messages": [{"role": "user", "content": "Hi"}]
-  }'
-  ```
-  - You still can set a token in the request header `authorization: Bearer <token>` and it will override the default token.
-- (Optional) Use environment variable `PORT` for setting different port other than `3000`.
+## Prerequisites
 
-## Available environment variables
-  - `PORT`: Port number to listen on (default: `3000`)
-  - `LOG_LEVEL`: Log level of [pino](https://getpino.io/#/docs/api?id=loggerlevel-string-gettersetter) (default: `info`)
-  - `DATABASE_URL`: Database URL for Prisma (currently only supports sqlite). Should start with `file:`. (default: `file:../coxy.db`)
-    - The relative path will be resolved to the absolute path at runtime.
+- Java 21+
+- Maven 3.9+
 
-## Advanced usage
-- Dummy token `_` to make coxy use the default token.
-    - In most cases, the default token just works without 'Authorization' header. But if your LLM client requires a non-empty API key, you can use the special dummy token `_` to make coxy use the default token.
-- Provisioning: launch the CLI with `--provision` to force initialize the database schema via Prisma.
-- Tips for using docker:
-  - Mount the sqlite db file from host to persist the tokens and use .env file to set environment variables. Use `--provision` first time to initialize the database schema via Prisma, e.g.
-    ```bash
-    docker run -p 3000:3000 -v /path/to/sqlite.db:/app/coxy.db -v /path/to/.env:/app/.env ghcr.io/coxy-proxy/coxy:latest --provision
-    ```
+## Full Setup Guide
 
-## Troubleshooting
-- I got status code 400 when using GPT-5-mini model.
-  - Make sure you have enabled "OpenAI GPT-5 mini" in your github account Copilot settings. The URL looks like `https://github.com/settings/copilot/features`.
-- I got the error `Fail to load API keys` when opening API Keys page.    
-  - Make sure you have sqlite db file and provisioned correctly.
-- I'm using podman and cannot access via `localhost:3000` but can access via `127.0.0.1:3000`.
-  - It seems podman's known issue or bug. Just use `127.0.0.1:3000` instead or setting another host name, like `127.0.0.1 coxy`, in your `/etc/hosts` file.
+- For a complete step-by-step guide (your own GitHub account, device flow, client setup, troubleshooting), see `docs/LOCAL_SETUP.md`.
 
-## Use cases
-- Use with [LLM](https://llm.datasette.io/en/stable/other-models.html#openai-compatible-models) CLI locally.
-- Chat with GitHub Copilot by [Open WebUI](https://docs.openwebui.com/getting-started/).
-## Requirements
+## Run
 
-- Node.js 22 or higher 
+```bash
+mvn spring-boot:run
+```
 
-## References
-- https://www.npmjs.com/package/@github/copilot-language-server
-- https://github.com/B00TK1D/copilot-api
-- https://github.com/ericc-ch/copilot-api
-- https://hub.docker.com/r/mouxan/copilot
+## Environment variables
 
-> Licensed under the [MIT License](./LICENSE).
+| Variable | Default | Description |
+|---|---|---|
+| `PORT` | `3000` | HTTP server port |
+| `DATABASE_PATH` | `./copiproxy.db` | SQLite database file path |
+| `LOG_LEVEL` | `INFO` | Root log level |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318/v1/traces` | OTLP trace collector endpoint |
+
+## Quick start
+
+### 1. Add a GitHub token
+
+```bash
+curl -X POST http://localhost:3000/admin/api-keys \
+  -H 'content-type: application/json' \
+  -d '{"name":"my-key","key":"ghu_xxx"}'
+```
+
+### 2. Set it as default
+
+```bash
+curl -X POST http://localhost:3000/admin/api-keys/default \
+  -H 'content-type: application/json' \
+  -d '{"id":"<api-key-id>"}'
+```
+
+### 3. Use the proxy
+
+```bash
+curl -X POST http://localhost:3000/api/chat/completions \
+  -H 'content-type: application/json' \
+  -d '{"model":"gpt-4.1","messages":[{"role":"user","content":"hi"}]}'
+```
+
+### Or use device flow (interactive GitHub login)
+
+```bash
+curl -N http://localhost:3000/admin/api-keys/device-flow
+```
+
+Follow the SSE events to complete authorization in your browser.
+
+## Observability
+
+- Health: `GET /actuator/health`
+- Metrics: `GET /actuator/metrics`
+- Prometheus: `GET /actuator/prometheus`
+- Distributed tracing exported via OTLP
+
+## License
+
+MIT
