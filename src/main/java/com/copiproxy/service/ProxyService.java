@@ -55,14 +55,15 @@ public class ProxyService {
      */
     public HttpResponse<InputStream> proxyRaw(String upstreamPath, HttpServletRequest request, byte[] body) {
         try {
-            String query = request.getQueryString();
-            String targetUrl = properties.copilotApiUrl() + upstreamPath + (query == null ? "" : "?" + query);
-            HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(targetUrl))
-                    .timeout(Duration.ofMinutes(5))
-                    .POST(HttpRequest.BodyPublishers.ofByteArray(body == null ? new byte[0] : body));
+            HttpResponse<InputStream> upstream = doPost(upstreamPath, request, body);
 
-            copyHeaders(request, builder);
-            HttpResponse<InputStream> upstream = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
+            if (upstream.statusCode() == 401) {
+                log.info("Got 401 from Copilot, refreshing token and retrying");
+                upstream.body().close();
+                String authKey = resolveAuthKey(request);
+                tokenResolverService.refreshToken(authKey);
+                upstream = doPost(upstreamPath, request, body);
+            }
 
             if (upstream.statusCode() == 429) {
                 log.warn("Copilot returned 429 Too Many Requests for {}", upstreamPath);
@@ -74,6 +75,18 @@ public class ProxyService {
         } catch (IOException e) {
             throw new IllegalStateException("Failed to proxy request", e);
         }
+    }
+
+    private HttpResponse<InputStream> doPost(String upstreamPath, HttpServletRequest request, byte[] body)
+            throws IOException, InterruptedException {
+        String query = request.getQueryString();
+        String targetUrl = properties.copilotApiUrl() + upstreamPath + (query == null ? "" : "?" + query);
+        HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(targetUrl))
+                .timeout(Duration.ofMinutes(5))
+                .POST(HttpRequest.BodyPublishers.ofByteArray(body == null ? new byte[0] : body));
+
+        copyHeaders(request, builder);
+        return httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
     }
 
     /**

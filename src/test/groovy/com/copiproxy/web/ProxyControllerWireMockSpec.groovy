@@ -177,7 +177,7 @@ class ProxyControllerWireMockSpec extends Specification {
         )
     }
 
-    def "messages returns Anthropic error on upstream 401"() {
+    def "messages returns Anthropic error on upstream 401 after retry"() {
         given:
         wm.stubFor(post(urlPathEqualTo("/chat/completions"))
                 .willReturn(aResponse()
@@ -198,11 +198,16 @@ class ProxyControllerWireMockSpec extends Specification {
         resp.body.writeTo(out)
         def result = mapper.readTree(out.toByteArray())
 
-        then:
+        then: "first attempt + token refresh + retry"
         1 * tokenResolver.resolveToken("Bearer bad-key") >> "jwt"
+        1 * tokenResolver.refreshToken("Bearer bad-key") >> "jwt-refreshed"
+        1 * tokenResolver.resolveToken("Bearer bad-key") >> "jwt-refreshed"
         resp.statusCode.value() == 401
         result.path("type").asText() == "error"
         result.path("error").path("type").asText() == "authentication_error"
+
+        and: "proxy hit Copilot twice (original + retry)"
+        wm.verify(2, postRequestedFor(urlPathEqualTo("/chat/completions")))
     }
 
     def "messages returns Anthropic error on upstream 429"() {
