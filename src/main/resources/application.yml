@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: copiproxy
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: jdbc:sqlite:${DATABASE_PATH:./copiproxy.db}
+    driver-class-name: org.sqlite.JDBC
+  sql:
+    init:
+      mode: always
+
+server:
+  port: ${PORT:3000}
+
+logging:
+  level:
+    root: ${LOG_LEVEL:INFO}
+
+copiproxy:
+  github:
+    device-code-url: https://github.com/login/device/code
+    oauth-url: https://github.com/login/oauth/access_token
+    copilot-api-url: https://api.githubcopilot.com
+    copilot-token-url: https://api.github.com/copilot_internal/v2/token
+    client-id: Iv1.b507a08c87ecfe98
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}

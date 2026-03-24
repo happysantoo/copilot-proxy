@@ -90,4 +90,4 @@ Follow the SSE events to complete authorization in your browser.
 
 ## License
 
-MIT
+Apache License 2.0 — see [LICENSE](LICENSE).
