@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -26,26 +27,40 @@ public final class ProxyEnvironmentConfig {
 
     /** Read from real environment. */
     public static void apply() {
-        apply(System::getenv);
+        apply(System.getenv());
     }
 
-    /** Testable overload that accepts a custom env lookup. */
-    static void apply(Function<String, String> env) {
-        configureProxy(env, "https_proxy", "HTTPS_PROXY", "https.proxyHost", "https.proxyPort", 443);
-        configureProxy(env, "http_proxy", "HTTP_PROXY", "http.proxyHost", "http.proxyPort", 80);
-        configureNoProxy(env);
+    /** Testable overload that accepts an env map. */
+    static void apply(Map<String, String> env) {
+        Function<String, String> lookup = key -> findIgnoreCase(env, key);
+        configureProxy(lookup, "https_proxy", "https.proxyHost", "https.proxyPort", 443);
+        configureProxy(lookup, "http_proxy", "http.proxyHost", "http.proxyPort", 80);
+        configureNoProxy(lookup);
+    }
+
+    /**
+     * Case-insensitive env var lookup. Scans the map for a key matching
+     * the requested name regardless of case (e.g. {@code https_proxy},
+     * {@code HTTPS_PROXY}, {@code Https_Proxy} all match).
+     */
+    private static String findIgnoreCase(Map<String, String> env, String name) {
+        String value = env.get(name);
+        if (value != null) return value;
+        for (Map.Entry<String, String> entry : env.entrySet()) {
+            if (entry.getKey().equalsIgnoreCase(name)) {
+                return entry.getValue();
+            }
+        }
+        return null;
     }
 
     private static void configureProxy(Function<String, String> env,
-                                        String lowerVar, String upperVar,
+                                        String varName,
                                         String hostProp, String portProp,
                                         int defaultPort) {
-        String url = env.apply(lowerVar);
+        String url = env.apply(varName);
         if (url == null || url.isBlank()) {
-            url = env.apply(upperVar);
-        }
-        if (url == null || url.isBlank()) {
-            log.debug("No {} / {} environment variable set", lowerVar, upperVar);
+            log.debug("No {} environment variable set (case-insensitive)", varName);
             return;
         }
 
@@ -53,7 +68,7 @@ public final class ProxyEnvironmentConfig {
             URI uri = URI.create(url);
             String host = uri.getHost();
             if (host == null || host.isBlank()) {
-                log.warn("Could not parse host from {} = '{}', skipping", lowerVar, url);
+                log.warn("Could not parse host from {} = '{}', skipping", varName, url);
                 return;
             }
 
@@ -68,15 +83,12 @@ public final class ProxyEnvironmentConfig {
             setIfAbsent(portProp, String.valueOf(port));
             log.info("Configured {} proxy from environment: {}:{}", hostProp.startsWith("https") ? "HTTPS" : "HTTP", host, port);
         } catch (IllegalArgumentException e) {
-            log.warn("Malformed proxy URL in {} = '{}': {}", lowerVar, url, e.getMessage());
+            log.warn("Malformed proxy URL in {} = '{}': {}", varName, url, e.getMessage());
         }
     }
 
     private static void configureNoProxy(Function<String, String> env) {
         String noProxy = env.apply("no_proxy");
-        if (noProxy == null || noProxy.isBlank()) {
-            noProxy = env.apply("NO_PROXY");
-        }
         if (noProxy == null || noProxy.isBlank()) {
             return;
         }

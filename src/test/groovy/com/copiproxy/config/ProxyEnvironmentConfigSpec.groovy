@@ -29,33 +29,37 @@ class ProxyEnvironmentConfigSpec extends Specification {
 
     def "sets HTTPS proxy from https_proxy (lowercase)"() {
         when:
-        ProxyEnvironmentConfig.apply({ key ->
-            key == "https_proxy" ? "http://proxy.corp.com:8080" : null
-        })
+        ProxyEnvironmentConfig.apply([https_proxy: "http://proxy.corp.com:8080"])
 
         then:
         System.getProperty("https.proxyHost") == "proxy.corp.com"
         System.getProperty("https.proxyPort") == "8080"
     }
 
-    def "sets HTTPS proxy from HTTPS_PROXY (uppercase) when lowercase absent"() {
+    def "sets HTTPS proxy from HTTPS_PROXY (uppercase)"() {
         when:
-        ProxyEnvironmentConfig.apply({ key ->
-            key == "HTTPS_PROXY" ? "http://proxy.corp.com:3128" : null
-        })
+        ProxyEnvironmentConfig.apply([HTTPS_PROXY: "http://proxy.corp.com:3128"])
 
         then:
         System.getProperty("https.proxyHost") == "proxy.corp.com"
         System.getProperty("https.proxyPort") == "3128"
     }
 
-    def "lowercase takes precedence over uppercase"() {
+    def "sets HTTPS proxy from mixed case Https_Proxy"() {
         when:
-        ProxyEnvironmentConfig.apply({ key ->
-            if (key == "https_proxy") return "http://lower.proxy.com:1111"
-            if (key == "HTTPS_PROXY") return "http://upper.proxy.com:2222"
-            return null
-        })
+        ProxyEnvironmentConfig.apply([Https_Proxy: "http://mixed.proxy.com:9999"])
+
+        then:
+        System.getProperty("https.proxyHost") == "mixed.proxy.com"
+        System.getProperty("https.proxyPort") == "9999"
+    }
+
+    def "exact lowercase match wins over case-insensitive"() {
+        when:
+        ProxyEnvironmentConfig.apply([
+                https_proxy: "http://lower.proxy.com:1111",
+                HTTPS_PROXY: "http://upper.proxy.com:2222"
+        ])
 
         then:
         System.getProperty("https.proxyHost") == "lower.proxy.com"
@@ -64,24 +68,28 @@ class ProxyEnvironmentConfigSpec extends Specification {
 
     def "sets HTTP proxy from http_proxy"() {
         when:
-        ProxyEnvironmentConfig.apply({ key ->
-            key == "http_proxy" ? "http://httpproxy.corp.com:9090" : null
-        })
+        ProxyEnvironmentConfig.apply([http_proxy: "http://httpproxy.corp.com:9090"])
 
         then:
         System.getProperty("http.proxyHost") == "httpproxy.corp.com"
         System.getProperty("http.proxyPort") == "9090"
     }
 
+    def "sets HTTP proxy from mixed case Http_Proxy"() {
+        when:
+        ProxyEnvironmentConfig.apply([Http_Proxy: "http://mixed.http.proxy.com:7070"])
+
+        then:
+        System.getProperty("http.proxyHost") == "mixed.http.proxy.com"
+        System.getProperty("http.proxyPort") == "7070"
+    }
+
     def "sets both HTTP and HTTPS proxy when both present"() {
         when:
-        ProxyEnvironmentConfig.apply({ key ->
-            switch (key) {
-                case "https_proxy": return "http://secure.proxy.com:443"
-                case "http_proxy": return "http://plain.proxy.com:80"
-                default: return null
-            }
-        })
+        ProxyEnvironmentConfig.apply([
+                https_proxy: "http://secure.proxy.com:443",
+                http_proxy : "http://plain.proxy.com:80"
+        ])
 
         then:
         System.getProperty("https.proxyHost") == "secure.proxy.com"
@@ -92,9 +100,7 @@ class ProxyEnvironmentConfigSpec extends Specification {
 
     def "defaults HTTPS port to 443 when not specified"() {
         when:
-        ProxyEnvironmentConfig.apply({ key ->
-            key == "https_proxy" ? "http://proxy.corp.com" : null
-        })
+        ProxyEnvironmentConfig.apply([https_proxy: "http://proxy.corp.com"])
 
         then:
         System.getProperty("https.proxyHost") == "proxy.corp.com"
@@ -103,9 +109,7 @@ class ProxyEnvironmentConfigSpec extends Specification {
 
     def "defaults HTTP port to 80 when not specified"() {
         when:
-        ProxyEnvironmentConfig.apply({ key ->
-            key == "http_proxy" ? "http://proxy.corp.com" : null
-        })
+        ProxyEnvironmentConfig.apply([http_proxy: "http://proxy.corp.com"])
 
         then:
         System.getProperty("http.proxyHost") == "proxy.corp.com"
@@ -114,22 +118,26 @@ class ProxyEnvironmentConfigSpec extends Specification {
 
     def "converts no_proxy to http.nonProxyHosts with pipe separator"() {
         when:
-        ProxyEnvironmentConfig.apply({ key ->
-            key == "no_proxy" ? "localhost, 127.0.0.1, .corp.example.com, internal.dev" : null
-        })
+        ProxyEnvironmentConfig.apply([no_proxy: "localhost, 127.0.0.1, .corp.example.com, internal.dev"])
 
         then:
         System.getProperty("http.nonProxyHosts") == "localhost|127.0.0.1|*.corp.example.com|internal.dev"
     }
 
-    def "reads NO_PROXY uppercase when lowercase absent"() {
+    def "reads NO_PROXY uppercase"() {
         when:
-        ProxyEnvironmentConfig.apply({ key ->
-            key == "NO_PROXY" ? "localhost,.internal" : null
-        })
+        ProxyEnvironmentConfig.apply([NO_PROXY: "localhost,.internal"])
 
         then:
         System.getProperty("http.nonProxyHosts") == "localhost|*.internal"
+    }
+
+    def "reads No_Proxy mixed case"() {
+        when:
+        ProxyEnvironmentConfig.apply([No_Proxy: "localhost,.mixed.corp"])
+
+        then:
+        System.getProperty("http.nonProxyHosts") == "localhost|*.mixed.corp"
     }
 
     def "does not override existing system property"() {
@@ -138,9 +146,7 @@ class ProxyEnvironmentConfigSpec extends Specification {
         System.setProperty("https.proxyPort", "1234")
 
         when:
-        ProxyEnvironmentConfig.apply({ key ->
-            key == "https_proxy" ? "http://env.proxy.com:5678" : null
-        })
+        ProxyEnvironmentConfig.apply([https_proxy: "http://env.proxy.com:5678"])
 
         then:
         System.getProperty("https.proxyHost") == "manual.proxy.com"
@@ -149,9 +155,7 @@ class ProxyEnvironmentConfigSpec extends Specification {
 
     def "handles credentials in URL without crashing"() {
         when:
-        ProxyEnvironmentConfig.apply({ key ->
-            key == "https_proxy" ? "http://user:pass@proxy.corp.com:8080" : null
-        })
+        ProxyEnvironmentConfig.apply([https_proxy: "http://user:pass@proxy.corp.com:8080"])
 
         then:
         System.getProperty("https.proxyHost") == "proxy.corp.com"
@@ -160,7 +164,7 @@ class ProxyEnvironmentConfigSpec extends Specification {
 
     def "no env vars set is a no-op"() {
         when:
-        ProxyEnvironmentConfig.apply({ null })
+        ProxyEnvironmentConfig.apply([:])
 
         then:
         System.getProperty("https.proxyHost") == null
@@ -172,9 +176,7 @@ class ProxyEnvironmentConfigSpec extends Specification {
 
     def "malformed URL is skipped gracefully"() {
         when:
-        ProxyEnvironmentConfig.apply({ key ->
-            key == "https_proxy" ? "://not-a-valid-url" : null
-        })
+        ProxyEnvironmentConfig.apply([https_proxy: "://not-a-valid-url"])
 
         then:
         noExceptionThrown()
