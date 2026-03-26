@@ -367,6 +367,18 @@ Copilot Pro has per-model rate limits (varies by tier). Wait and retry. Consider
 export ANTHROPIC_DEFAULT_SONNET_MODEL="claude-sonnet-4"
 ```
 
+### "Cannot reach the network" behind a corporate proxy
+
+If your machine uses a corporate proxy (`http_proxy` / `https_proxy` env vars), Claude Code will try to route **all** traffic through it — including connections to `localhost` where CopiProxy runs. The corporate proxy cannot reach your local machine, so the connection fails.
+
+Add `localhost` and `127.0.0.1` to `no_proxy` so that Claude Code connects to CopiProxy directly:
+
+```bash
+export no_proxy="${no_proxy:+$no_proxy,}localhost,127.0.0.1"
+```
+
+CopiProxy itself already reads `https_proxy` / `http_proxy` and routes its upstream GitHub API calls through the corporate proxy automatically (see [CORPORATE_PROXY.md](CORPORATE_PROXY.md)).
+
 ### Claude Code hangs on startup
 
 Claude Code may try to reach `api.anthropic.com` for non-chat traffic. Set:

@@ -26,4 +26,34 @@ class ProxyControllerSpec extends Specification {
         1 * proxyService.proxy("/models", request) >> expected
         result == expected
     }
+
+    def "messages returns auth error on IllegalStateException with 401"() {
+        given:
+        def body = '{"model":"claude-opus-4-6","messages":[{"role":"user","content":"hi"}],"stream":false}'.bytes
+
+        when:
+        def result = controller.messages(request, body)
+
+        then:
+        1 * translationService.translateRequest(body) >> { throw new IllegalStateException("Copilot token API failed with 401: unauthorized") }
+        result.statusCode.value() == 401
+        def out = new ByteArrayOutputStream()
+        result.body.writeTo(out)
+        out.toString().contains("authentication_error")
+    }
+
+    def "messages returns 500 on unexpected RuntimeException"() {
+        given:
+        def body = '{"model":"claude-opus-4-6","messages":[{"role":"user","content":"hi"}],"stream":false}'.bytes
+
+        when:
+        def result = controller.messages(request, body)
+
+        then:
+        1 * translationService.translateRequest(body) >> { throw new RuntimeException("boom") }
+        result.statusCode.value() == 500
+        def out = new ByteArrayOutputStream()
+        result.body.writeTo(out)
+        out.toString().contains("api_error")
+    }
 }

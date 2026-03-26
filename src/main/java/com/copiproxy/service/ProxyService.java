@@ -69,11 +69,13 @@ public class ProxyService {
                 log.warn("Copilot returned 429 Too Many Requests for {}", upstreamPath);
             }
             return upstream;
+        } catch (IllegalStateException e) {
+            throw e;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Failed to proxy request", e);
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to proxy request", e);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to proxy request: " + e.getMessage(), e);
         }
     }
 

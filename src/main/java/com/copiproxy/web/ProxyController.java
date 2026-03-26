@@ -65,9 +65,14 @@ public class ProxyController {
             } else {
                 return buildNonStreamingResponse(upstream, requestModel);
             }
-        } catch (IOException e) {
-            log.error("Translation error", e);
-            return anthropicError(500, "internal_error", "Failed to translate request: " + e.getMessage());
+        } catch (IllegalStateException e) {
+            log.error("Proxy/auth error: {}", e.getMessage());
+            int status = e.getMessage() != null && e.getMessage().contains("401") ? 401 : 502;
+            String type = status == 401 ? "authentication_error" : "api_error";
+            return anthropicError(status, type, e.getMessage());
+        } catch (Exception e) {
+            log.error("Unexpected error in /v1/messages", e);
+            return anthropicError(500, "api_error", e.getMessage() != null ? e.getMessage() : "Internal server error");
         }
     }
 
