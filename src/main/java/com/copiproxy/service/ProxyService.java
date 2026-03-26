@@ -55,13 +55,20 @@ public class ProxyService {
      */
     public HttpResponse<InputStream> proxyRaw(String upstreamPath, HttpServletRequest request, byte[] body) {
         try {
-            HttpResponse<InputStream> upstream = doPost(upstreamPath, request, body);
+            HttpResponse<InputStream> upstream;
+
+            try {
+                upstream = doPost(upstreamPath, request, body);
+            } catch (Exception firstAttempt) {
+                log.info("First attempt failed ({}), refreshing token and retrying", firstAttempt.getMessage());
+                tokenResolverService.refreshToken(resolveAuthKey(request));
+                upstream = doPost(upstreamPath, request, body);
+            }
 
             if (upstream.statusCode() == 401) {
                 log.info("Got 401 from Copilot, refreshing token and retrying");
                 upstream.body().close();
-                String authKey = resolveAuthKey(request);
-                tokenResolverService.refreshToken(authKey);
+                tokenResolverService.refreshToken(resolveAuthKey(request));
                 upstream = doPost(upstreamPath, request, body);
             }
 
@@ -69,11 +76,11 @@ public class ProxyService {
                 log.warn("Copilot returned 429 Too Many Requests for {}", upstreamPath);
             }
             return upstream;
-        } catch (IllegalStateException e) {
-            throw e;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Failed to proxy request", e);
+        } catch (IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
             throw new IllegalStateException("Failed to proxy request: " + e.getMessage(), e);
         }

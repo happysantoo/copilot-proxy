@@ -62,6 +62,7 @@ public class TokenResolverService {
         String resolvedKey = resolveUserKey(authorizationHeader);
         String cacheKey = Integer.toHexString(resolvedKey.hashCode());
         cache.remove(cacheKey);
+        inflight.remove(cacheKey);
         log.info("Evicted expired Copilot token, fetching fresh one");
         return fetchAndCache(resolvedKey, cacheKey);
     }

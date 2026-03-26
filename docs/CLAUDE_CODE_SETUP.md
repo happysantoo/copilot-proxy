@@ -349,6 +349,8 @@ Your GitHub token is missing, expired, or not set as the default key.
 2. Refresh metadata: `curl -X POST http://localhost:3000/admin/api-keys/<id>/refresh-meta`
 3. If expired, re-run the device flow (step 4, Option A).
 
+For deeper analysis (temporary runtime expiry vs dead/revoked GitHub token), see [TOKEN_REFRESH_AND_AUTH_DEBUGGING.md](TOKEN_REFRESH_AND_AUTH_DEBUGGING.md).
+
 ### "model not found" or 404
 
 The model ID is not available under your Copilot subscription.

@@ -38,6 +38,8 @@ Some Anthropic features or fields may not map one-to-one to Copilot. See [docs/T
 ## Full Setup Guide
 
 - For a complete step-by-step guide (your own GitHub account, device flow, client setup, troubleshooting), see `docs/LOCAL_SETUP.md`.
+- For Claude Code-specific setup, see [docs/CLAUDE_CODE_SETUP.md](docs/CLAUDE_CODE_SETUP.md).
+- For detailed 401/token troubleshooting and refresh behavior, see [docs/TOKEN_REFRESH_AND_AUTH_DEBUGGING.md](docs/TOKEN_REFRESH_AND_AUTH_DEBUGGING.md).
 
 ## Run
 
