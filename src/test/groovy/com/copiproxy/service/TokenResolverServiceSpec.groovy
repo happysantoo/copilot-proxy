@@ -10,15 +10,15 @@ class TokenResolverServiceSpec extends Specification {
     def apiKeyService = Mock(ApiKeyService)
     def service = new TokenResolverService(githubCopilotService, apiKeyService)
 
-    def "resolves token from provided bearer key"() {
+    def "resolves token from provided GitHub bearer key"() {
         given:
         def meta = new CopilotMeta("copilot-token", System.currentTimeMillis() + 600_000L, null, 1, 1)
 
         when:
-        def token = service.resolveToken("Bearer user-key")
+        def token = service.resolveToken("Bearer ghu_user-key")
 
         then:
-        1 * githubCopilotService.fetchCopilotMeta("user-key") >> meta
+        1 * githubCopilotService.fetchCopilotMeta("ghu_user-key") >> meta
         0 * apiKeyService._
         token == "copilot-token"
     }
@@ -28,11 +28,11 @@ class TokenResolverServiceSpec extends Specification {
         def meta = new CopilotMeta("cached-token", System.currentTimeMillis() + 600_000L, null, null, null)
 
         when:
-        def first = service.resolveToken("Bearer cache-key")
-        def second = service.resolveToken("Bearer cache-key")
+        def first = service.resolveToken("Bearer ghu_cache-key")
+        def second = service.resolveToken("Bearer ghu_cache-key")
 
         then:
-        1 * githubCopilotService.fetchCopilotMeta("cache-key") >> meta
+        1 * githubCopilotService.fetchCopilotMeta("ghu_cache-key") >> meta
         first == "cached-token"
         second == "cached-token"
     }
@@ -71,12 +71,12 @@ class TokenResolverServiceSpec extends Specification {
         def fresh = new CopilotMeta("fresh-token", System.currentTimeMillis() + 600_000L, null, null, null)
 
         when:
-        def first = service.resolveToken("Bearer refresh-key")
-        def refreshed = service.refreshToken("Bearer refresh-key")
+        def first = service.resolveToken("Bearer ghu_refresh-key")
+        def refreshed = service.refreshToken("Bearer ghu_refresh-key")
 
         then:
-        1 * githubCopilotService.fetchCopilotMeta("refresh-key") >> stale
-        1 * githubCopilotService.fetchCopilotMeta("refresh-key") >> fresh
+        1 * githubCopilotService.fetchCopilotMeta("ghu_refresh-key") >> stale
+        1 * githubCopilotService.fetchCopilotMeta("ghu_refresh-key") >> fresh
         first == "stale-token"
         refreshed == "fresh-token"
     }
@@ -87,19 +87,19 @@ class TokenResolverServiceSpec extends Specification {
         def refreshed = new CopilotMeta("refreshed-token", System.currentTimeMillis() + 600_000L, null, null, null)
 
         when: "initial resolve populates cache and registers the key for proactive refresh"
-        def first = service.resolveToken("Bearer proactive-key")
+        def first = service.resolveToken("Bearer ghu_proactive-key")
 
         then:
-        1 * githubCopilotService.fetchCopilotMeta("proactive-key") >> original
+        1 * githubCopilotService.fetchCopilotMeta("ghu_proactive-key") >> original
         first == "original-token"
 
         when: "simulate the scheduled proactive refresh firing"
-        def cacheKey = Integer.toHexString("proactive-key".hashCode())
+        def cacheKey = Integer.toHexString("ghu_proactive-key".hashCode())
         service.doProactiveRefresh(cacheKey)
-        def second = service.resolveToken("Bearer proactive-key")
+        def second = service.resolveToken("Bearer ghu_proactive-key")
 
         then:
-        1 * githubCopilotService.fetchCopilotMeta("proactive-key") >> refreshed
+        1 * githubCopilotService.fetchCopilotMeta("ghu_proactive-key") >> refreshed
         second == "refreshed-token"
     }
 
@@ -108,14 +108,14 @@ class TokenResolverServiceSpec extends Specification {
         def meta = new CopilotMeta("token", System.currentTimeMillis() + 600_000L, null, null, null)
 
         when: "initial resolve"
-        service.resolveToken("Bearer retry-key")
+        service.resolveToken("Bearer ghu_retry-key")
 
         then:
-        1 * githubCopilotService.fetchCopilotMeta("retry-key") >> meta
+        1 * githubCopilotService.fetchCopilotMeta("ghu_retry-key") >> meta
 
         when: "proactive refresh fails"
-        def cacheKey = Integer.toHexString("retry-key".hashCode())
-        githubCopilotService.fetchCopilotMeta("retry-key") >> { throw new IllegalStateException("network error") }
+        def cacheKey = Integer.toHexString("ghu_retry-key".hashCode())
+        githubCopilotService.fetchCopilotMeta("ghu_retry-key") >> { throw new IllegalStateException("network error") }
         service.doProactiveRefresh(cacheKey)
 
         then: "does not throw — logs warning and schedules retry"
@@ -137,6 +137,50 @@ class TokenResolverServiceSpec extends Specification {
 
         then:
         noExceptionThrown()
+    }
+
+    def "falls back to default key when non-GitHub token is provided (e.g. Anthropic sk- key)"() {
+        given:
+        def defaultRecord = new ApiKeyRecord("id", "name", "default-key", true, 1L, null, 0, null)
+        def meta = new CopilotMeta("default-token", System.currentTimeMillis() + 600_000L, null, null, null)
+
+        when:
+        def token = service.resolveToken("Bearer sk-ant-api03-fake-key")
+
+        then:
+        1 * apiKeyService.getDefaultKey() >> defaultRecord
+        1 * githubCopilotService.fetchCopilotMeta("default-key") >> meta
+        token == "default-token"
+    }
+
+    def "falls back to default key when x-api-key style bearer is provided"() {
+        given:
+        def defaultRecord = new ApiKeyRecord("id", "name", "default-key", true, 1L, null, 0, null)
+        def meta = new CopilotMeta("default-token", System.currentTimeMillis() + 600_000L, null, null, null)
+
+        when:
+        def token = service.resolveToken("Bearer some-random-key")
+
+        then:
+        1 * apiKeyService.getDefaultKey() >> defaultRecord
+        1 * githubCopilotService.fetchCopilotMeta("default-key") >> meta
+        token == "default-token"
+    }
+
+    def "accepts all GitHub token prefixes"() {
+        given:
+        def meta = new CopilotMeta("gh-token", System.currentTimeMillis() + 600_000L, null, null, null)
+
+        when:
+        def token = service.resolveToken("Bearer ${ghToken}")
+
+        then:
+        1 * githubCopilotService.fetchCopilotMeta(ghToken) >> meta
+        0 * apiKeyService._
+        token == "gh-token"
+
+        where:
+        ghToken << ["ghu_abc123", "gho_abc123", "ghp_abc123", "github_pat_abc123"]
     }
 
     def "throws when default key missing"() {

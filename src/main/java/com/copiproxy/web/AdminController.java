@@ -34,12 +34,12 @@ public class AdminController {
     }
 
     @PatchMapping("/{id}")
-    public ApiKeyRecord update(@PathVariable String id, @RequestBody UpdateApiKeyRequest req) {
+    public ApiKeyRecord update(@PathVariable("id") String id, @RequestBody UpdateApiKeyRequest req) {
         return apiKeyService.updateName(id, req.name());
     }
 
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable String id) {
+    public void delete(@PathVariable("id") String id) {
         apiKeyService.delete(id);
     }
 
@@ -49,7 +49,7 @@ public class AdminController {
     }
 
     @PostMapping("/{id}/refresh-meta")
-    public ApiKeyRecord refresh(@PathVariable String id) {
+    public ApiKeyRecord refresh(@PathVariable("id") String id) {
         return apiKeyService.refreshMeta(id);
     }
 

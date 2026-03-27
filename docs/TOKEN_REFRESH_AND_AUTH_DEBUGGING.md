@@ -176,7 +176,7 @@ curl http://localhost:3000/admin/api-keys
 # set default key
 curl -X POST http://localhost:3000/admin/api-keys/default \
   -H "Content-Type: application/json" \
-  -d '{"id":"<new-key-id>"}'
+  -d '{"id":"deb533ae-54df-49d9-a961-8102034a171c"}'
 ```
 
 ---

@@ -69,33 +69,40 @@ public class TokenResolverService {
 
     private String resolveUserKey(String authorizationHeader) {
         String userKey = parseBearer(authorizationHeader);
-        if (userKey == null || userKey.isBlank() || "_".equals(userKey)) {
-            ApiKeyRecord defaultKey = apiKeyService.getDefaultKey();
-            if (defaultKey == null) {
-                throw new IllegalStateException("No default API key configured");
-            }
-            return defaultKey.key();
+        if (isGithubToken(userKey)) {
+            log.debug("Using request GitHub token [cacheKey={}]", Integer.toHexString(userKey.hashCode()));
+            return userKey;
         }
-        return userKey;
+        if (userKey != null && !userKey.isBlank() && !"_".equals(userKey)) {
+            log.debug("Ignoring non-GitHub token (prefix={}), falling back to default key",
+                    userKey.length() > 6 ? userKey.substring(0, 6) + "..." : "***");
+        }
+        ApiKeyRecord defaultKey = apiKeyService.getDefaultKey();
+        if (defaultKey == null) {
+            throw new IllegalStateException("No default API key configured");
+        }
+        log.debug("Using default API key [cacheKey={}]", Integer.toHexString(defaultKey.key().hashCode()));
+        return defaultKey.key();
+    }
+
+    private static boolean isGithubToken(String key) {
+        if (key == null || key.isBlank()) return false;
+        return key.startsWith("ghu_") || key.startsWith("gho_")
+                || key.startsWith("ghp_") || key.startsWith("github_pat_");
     }
 
     private String fetchAndCache(String resolvedKey, String cacheKey) {
-        CompletableFuture<CopilotMeta> existing = inflight.get(cacheKey);
-        if (existing != null) {
-            return existing.join().token();
-        }
-
-        CompletableFuture<CopilotMeta> created = CompletableFuture
-                .supplyAsync(() -> githubCopilotService.fetchCopilotMeta(resolvedKey))
-                .whenComplete((meta, throwable) -> inflight.remove(cacheKey));
-        inflight.put(cacheKey, created);
-        CopilotMeta meta = created.join();
-        cache.put(cacheKey, meta);
-
-        keysByCacheKey.put(cacheKey, resolvedKey);
-        scheduleRefresh(cacheKey, meta);
-
-        return meta.token();
+        CompletableFuture<CopilotMeta> future = inflight.computeIfAbsent(cacheKey, key ->
+                CompletableFuture.supplyAsync(() -> githubCopilotService.fetchCopilotMeta(resolvedKey))
+                        .thenApply(meta -> {
+                            cache.put(cacheKey, meta);
+                            keysByCacheKey.put(cacheKey, resolvedKey);
+                            scheduleRefresh(cacheKey, meta);
+                            return meta;
+                        })
+                        .whenComplete((meta, throwable) -> inflight.remove(cacheKey))
+        );
+        return future.join().token();
     }
 
     private void scheduleRefresh(String cacheKey, CopilotMeta meta) {

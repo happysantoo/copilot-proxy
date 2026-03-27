@@ -103,7 +103,7 @@ Copy the `id` from the response, then:
 ```bash
 curl -X POST http://localhost:3000/admin/api-keys/default \
   -H 'content-type: application/json' \
-  -d '{"id":"<API_KEY_ID>"}'
+  -d '{"id":"c0036b19-c253-4154-b7ad-903478a7270d"}'
 ```
 
 ### Option B: Device flow (login in browser)
@@ -184,9 +184,9 @@ Point Claude Code at the local proxy and set default model IDs to ones your Copi
 ```bash
 export ANTHROPIC_BASE_URL="http://localhost:3000"
 export ANTHROPIC_API_KEY="_"
-export ANTHROPIC_DEFAULT_SONNET_MODEL="claude-sonnet-4.6"
+export ANTHROPIC_DEFAULT_SONNET_MODEL="claude-sonnet-4.5"
 export ANTHROPIC_DEFAULT_OPUS_MODEL="claude-opus-4-6"
-export ANTHROPIC_DEFAULT_HAIKU_MODEL="claude-sonnet-4.6"
+export ANTHROPIC_DEFAULT_HAIKU_MODEL="claude-sonnet-4.5"
 claude
 ```
 
