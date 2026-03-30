@@ -29,6 +29,11 @@ target/
 .DS_Store
 Thumbs.db
 
+# Python (e.g. scripts/github-device-auth)
+__pycache__/
+*.py[cod]
+*$py.class
+
 # Environment
 .env
 .env.local
