@@ -34,6 +34,7 @@ Some Anthropic features or fields may not map one-to-one to Copilot. See [docs/T
 
 - Java 21+
 - Maven 3.9+
+- Python 3 (optional — for the dev start script under `scripts/github-device-auth/`)
 
 ## Full Setup Guide
 
@@ -46,6 +47,18 @@ Some Anthropic features or fields may not map one-to-one to Copilot. See [docs/T
 ```bash
 mvn spring-boot:run
 ```
+
+### Optional: one-step dev start (Python)
+
+If you have **Python 3** on your PATH, [`scripts/github-device-auth/copiproxy_dev_start.py`](scripts/github-device-auth/copiproxy_dev_start.py) can run `mvn spring-boot:run`, wait for `/health`, skip GitHub device login when the stored default key still works, and otherwise complete device flow and **set the new key as default** (stdlib only; no `pip`). Use `--skip-start` if the app is already up.
+
+```bash
+python3 scripts/github-device-auth/copiproxy_dev_start.py --help
+```
+
+Tests: `python3 -m unittest discover -s scripts/github-device-auth -p 'test_*.py' -v`
+
+More detail: [docs/LOCAL_SETUP.md](docs/LOCAL_SETUP.md).
 
 ## Code coverage (JaCoCo)
 

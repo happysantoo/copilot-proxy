@@ -8,6 +8,7 @@ This guide walks you through configuring and running CopiProxy locally using you
 - Java 21 installed and available on PATH.
 - Maven 3.9+ installed.
 - `curl` installed.
+- **Python 3** (optional) — for [`scripts/github-device-auth/copiproxy_dev_start.py`](../scripts/github-device-auth/copiproxy_dev_start.py), which automates startup and device login.
 
 Verify:
 
@@ -15,6 +16,7 @@ Verify:
 java -version
 mvn -version
 curl --version
+python3 --version   # optional
 ```
 
 ## 2) Clone and build
@@ -64,6 +66,28 @@ or
 
 ```bash
 java -jar target/copiproxy-0.1.0.jar
+```
+
+or **automated start + auth** (Python 3, stdlib only — no `pip`):
+
+```bash
+python3 scripts/github-device-auth/copiproxy_dev_start.py
+```
+
+This runs Maven in the foreground, waits until `GET /health` returns `ok`, checks whether the **default** API key in SQLite still works (`POST /admin/api-keys/{id}/refresh-meta`), and only then runs GitHub **device flow** if needed. It registers the new OAuth token via `POST /admin/api-keys` and sets it as default with `POST /admin/api-keys/default` (unlike the SSE device-flow endpoint alone, which does not set default).
+
+If the app is already running:
+
+```bash
+python3 scripts/github-device-auth/copiproxy_dev_start.py --skip-start --base-url http://127.0.0.1:3000
+```
+
+Useful flags: `--force-auth` (always run device flow), `--no-browser` / `--no-clipboard`. Proxy and TLS: set `http_proxy` / `https_proxy` / `no_proxy` and `SSL_CERT_FILE` as for other tools; see [CORPORATE_PROXY.md](CORPORATE_PROXY.md).
+
+Run unit tests for the script:
+
+```bash
+python3 -m unittest discover -s scripts/github-device-auth -p 'test_*.py' -v
 ```
 
 ## 5) Verify service health
@@ -121,6 +145,10 @@ You will receive events including:
 
 Open `verificationUri`, enter `userCode`, approve access.  
 On success, CopiProxy stores the resulting token as a key record (you can then set it as default with `/admin/api-keys/default`).
+
+### Option C: Same flow via Python helper
+
+The script in `scripts/github-device-auth/copiproxy_dev_start.py` performs an equivalent OAuth device exchange against GitHub (aligned with the Java client), then creates the key and **sets default** in one go. Prefer this if you want a single command for “start + login when needed”; see **§4** above.
 
 ## 7) Test endpoints
 
